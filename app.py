@@ -1,3 +1,18 @@
+import sys
+import huggingface_hub
+
+# HfFolder was removed in huggingface_hub>=0.24. Patch a stub so Gradio's
+# oauth module doesn't crash when it tries to import it.
+if not hasattr(huggingface_hub, "HfFolder"):
+    class _HfFolder:
+        @staticmethod
+        def get_token():
+            return None
+        @staticmethod
+        def save_token(token):
+            pass
+    huggingface_hub.HfFolder = _HfFolder
+
 import cv2
 import gradio as gr
 import numpy as np
@@ -16,15 +31,14 @@ def detect_faces(image):
 
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-    for (x, y, w, h) in faces:
+    for i, (x, y, w, h) in enumerate(faces):
         cv2.rectangle(img_bgr, (x, y), (x + w, y + h), (0, 200, 100), 2)
         roi_gray = gray[y:y + h, x:x + w]
         roi_color = img_bgr[y:y + h, x:x + w]
         eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=10)
         for (ex, ey, ew, eh) in eyes:
             cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (255, 100, 0), 1)
-        label = f"Face {faces.tolist().index([x, y, w, h]) + 1}"
-        cv2.putText(img_bgr, label, (x, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 100), 2)
+        cv2.putText(img_bgr, f"Face {i + 1}", (x, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 100), 2)
 
     result = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     count = len(faces)
@@ -44,7 +58,6 @@ demo = gr.Interface(
         "Real-time face and eye detection using OpenCV Haar Cascades. "
         "Originally built as an automated attendance system. Upload any photo to try it."
     ),
-    examples=[],
     allow_flagging="never",
 )
 
